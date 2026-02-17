@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 
 const app = express();
-const port = Number(process.env.PORT || 3001);
+const port = Number(process.env.PORT || 8080);
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
@@ -118,8 +118,8 @@ app.use((error, _req, res, _next) => {
 
 initializeDb()
   .then(() => {
-    app.listen(port, () => {
-      console.log(`Server listening on port ${port}`);
+    app.listen(port, '0.0.0.0', () => {
+      console.log(`Server listening on 0.0.0.0:${port}`);
     });
   })
   .catch((error) => {

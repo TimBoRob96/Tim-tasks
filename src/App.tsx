@@ -304,29 +304,29 @@ function App() {
         </div>
       ) : null}
 
-      <form className="task-form" onSubmit={handleAddTask}>
-        <input
-          value={newTask}
-          onChange={(event) => setNewTask(event.target.value)}
-          placeholder="Add a task"
-          aria-label="Task title"
-        />
-        <input
-          value={newProject}
-          onChange={(event) => setNewProject(event.target.value)}
-          placeholder="Project"
-          list="project-suggestions"
-          aria-label="Project"
-        />
-        <datalist id="project-suggestions">
-          {projects.map((project) => (
-            <option key={project} value={project} />
-          ))}
-        </datalist>
-        <button type="submit" disabled={!canWrite}>
-          Add
-        </button>
-      </form>
+      {canWrite ? (
+        <form className="task-form" onSubmit={handleAddTask}>
+          <input
+            value={newTask}
+            onChange={(event) => setNewTask(event.target.value)}
+            placeholder="Add a task"
+            aria-label="Task title"
+          />
+          <input
+            value={newProject}
+            onChange={(event) => setNewProject(event.target.value)}
+            placeholder="Project"
+            list="project-suggestions"
+            aria-label="Project"
+          />
+          <datalist id="project-suggestions">
+            {projects.map((project) => (
+              <option key={project} value={project} />
+            ))}
+          </datalist>
+          <button type="submit">Add</button>
+        </form>
+      ) : null}
 
       <section className="project-filter">
         <div className="filter-head">

@@ -5,6 +5,7 @@ type ColumnId = 'todo' | 'doing' | 'done';
 type Task = {
   id: string;
   title: string;
+  project: string;
   column: ColumnId;
 };
 
@@ -17,10 +18,26 @@ const columns: { id: ColumnId; title: string }[] = [
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState('');
+  const [newProject, setNewProject] = useState('General');
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [projectFiltersReady, setProjectFiltersReady] = useState(false);
+
   const [password, setPassword] = useState('');
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [canWrite, setCanWrite] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const projects = useMemo(() => {
+    const unique = [...new Set(tasks.map((task) => task.project))];
+    return unique.sort((a, b) => a.localeCompare(b));
+  }, [tasks]);
+
+  const visibleTasks = useMemo(() => {
+    if (!selectedProjects.length) return tasks;
+    return tasks.filter((task) => selectedProjects.includes(task.project));
+  }, [tasks, selectedProjects]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -46,15 +63,29 @@ function App() {
     fetchInitialData();
   }, []);
 
+  useEffect(() => {
+    if (!projectFiltersReady) {
+      setSelectedProjects(projects);
+      setProjectFiltersReady(true);
+      return;
+    }
+
+    setSelectedProjects((prev) => {
+      const retained = prev.filter((project) => projects.includes(project));
+      const additions = projects.filter((project) => !retained.includes(project));
+      return [...retained, ...additions];
+    });
+  }, [projects, projectFiltersReady]);
+
   const counts = useMemo(() => {
     return columns.reduce<Record<ColumnId, number>>(
       (acc, column) => {
-        acc[column.id] = tasks.filter((task) => task.column === column.id).length;
+        acc[column.id] = visibleTasks.filter((task) => task.column === column.id).length;
         return acc;
       },
       { todo: 0, doing: 0, done: 0 }
     );
-  }, [tasks]);
+  }, [visibleTasks]);
 
   const parseError = async (response: Response, fallback: string) => {
     try {
@@ -68,7 +99,7 @@ function App() {
         return payload.error;
       }
     } catch {
-      // no-op, fallback below
+      // no-op
     }
     return fallback;
   };
@@ -90,8 +121,10 @@ function App() {
       if (!response.ok) {
         throw new Error(await parseError(response, 'Login failed.'));
       }
+
       setPassword('');
       setCanWrite(true);
+      setIsLoginOpen(false);
       setError(null);
     } catch (err) {
       setCanWrite(false);
@@ -113,13 +146,14 @@ function App() {
     }
 
     const pendingTitle = newTask.trim();
+    const pendingProject = newProject.trim() || 'General';
     setNewTask('');
 
     try {
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: pendingTitle })
+        body: JSON.stringify({ title: pendingTitle, project: pendingProject })
       });
 
       if (!response.ok) {
@@ -143,6 +177,7 @@ function App() {
       setError('Login required to move tasks.');
       return;
     }
+
     const taskId = event.dataTransfer.getData('taskId');
     if (!taskId) return;
 
@@ -169,29 +204,65 @@ function App() {
     }
   };
 
+  const toggleProject = (project: string) => {
+    setSelectedProjects((prev) => {
+      if (prev.includes(project)) {
+        return prev.filter((item) => item !== project);
+      }
+      return [...prev, project];
+    });
+  };
+
+  const selectAllProjects = () => setSelectedProjects(projects);
+  const clearProjects = () => setSelectedProjects([]);
+
   return (
     <div className="page">
       <header className="header">
-        <h1>TimTasks Kanban</h1>
-        <p>React + Vite + Fly.io + Neon Postgres</p>
+        <div>
+          <h1>Kanban</h1>
+          <p>Have a look at what I am working on!</p>
+        </div>
+        <div className="header-actions">
+          {canWrite ? (
+            <button type="button" className="auth-btn" onClick={handleLogout}>
+              Logout
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="auth-btn"
+              onClick={() => setIsLoginOpen(true)}
+            >
+              Login
+            </button>
+          )}
+        </div>
       </header>
 
-      <form className="write-key-row" onSubmit={handleLogin}>
-        <input
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          placeholder={canWrite ? 'Write access enabled' : 'Enter write password'}
-          aria-label="Write password"
-        />
-        {canWrite ? (
-          <button type="button" onClick={handleLogout}>
-            Logout
-          </button>
-        ) : (
-          <button type="submit">Login</button>
-        )}
-      </form>
+      {isLoginOpen ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setIsLoginOpen(false)}>
+          <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h2>Login</h2>
+            <form onSubmit={handleLogin} className="modal-form">
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter password"
+                aria-label="Write password"
+                autoFocus
+              />
+              <div className="modal-actions">
+                <button type="button" className="secondary-btn" onClick={() => setIsLoginOpen(false)}>
+                  Cancel
+                </button>
+                <button type="submit">Sign in</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       <form className="task-form" onSubmit={handleAddTask}>
         <input
@@ -200,10 +271,53 @@ function App() {
           placeholder="Add a task"
           aria-label="Task title"
         />
+        <input
+          value={newProject}
+          onChange={(event) => setNewProject(event.target.value)}
+          placeholder="Project"
+          list="project-suggestions"
+          aria-label="Project"
+        />
+        <datalist id="project-suggestions">
+          {projects.map((project) => (
+            <option key={project} value={project} />
+          ))}
+        </datalist>
         <button type="submit" disabled={!canWrite}>
           Add
         </button>
       </form>
+
+      <section className="project-filter">
+        <div className="filter-head">
+          <strong>Projects</strong>
+          <div className="filter-actions">
+            <button type="button" className="link-btn" onClick={selectAllProjects}>
+              Show all
+            </button>
+            <button type="button" className="link-btn" onClick={clearProjects}>
+              Hide all
+            </button>
+          </div>
+        </div>
+
+        <div className="filter-list">
+          {projects.length ? (
+            projects.map((project) => (
+              <label key={project} className="filter-item">
+                <input
+                  type="checkbox"
+                  checked={selectedProjects.includes(project)}
+                  onChange={() => toggleProject(project)}
+                />
+                <span>{project}</span>
+              </label>
+            ))
+          ) : (
+            <span className="muted">No projects yet</span>
+          )}
+        </div>
+      </section>
 
       {loading ? <p className="status">Loading tasks...</p> : null}
       {error ? <p className="status error">{error}</p> : null}
@@ -222,7 +336,7 @@ function App() {
             </div>
 
             <div className="cards">
-              {tasks
+              {visibleTasks
                 .filter((task) => task.column === column.id)
                 .map((task) => (
                   <div
@@ -231,7 +345,8 @@ function App() {
                     draggable={canWrite}
                     onDragStart={(event) => event.dataTransfer.setData('taskId', task.id)}
                   >
-                    {task.title}
+                    <div className="card-title">{task.title}</div>
+                    <div className="card-project">{task.project}</div>
                   </div>
                 ))}
             </div>

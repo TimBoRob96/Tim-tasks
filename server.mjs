@@ -56,6 +56,11 @@ function sanitizeTitle(value) {
   return withoutControls.replace(/\s+/g, ' ').trim();
 }
 
+function sanitizeProject(value) {
+  const withoutControls = value.replace(/[\u0000-\u001f\u007f]/g, '');
+  return withoutControls.replace(/\s+/g, ' ').trim();
+}
+
 function requireWriteAuth(req, res, next) {
   const token = getCookie(req, sessionCookieName);
   if (!token || !isValidSessionToken(token)) {
@@ -127,9 +132,14 @@ async function initializeDb() {
     CREATE TABLE IF NOT EXISTS tasks (
       id UUID PRIMARY KEY,
       title TEXT NOT NULL,
+      project TEXT NOT NULL DEFAULT 'General',
       column_id TEXT NOT NULL CHECK (column_id IN ('todo', 'doing', 'done')),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+  await pool.query(`
+    ALTER TABLE tasks
+    ADD COLUMN IF NOT EXISTS project TEXT NOT NULL DEFAULT 'General';
   `);
 }
 
@@ -172,7 +182,7 @@ app.post('/api/logout', (req, res) => {
 app.get('/api/tasks', async (_req, res, next) => {
   try {
     const result = await pool.query(
-      'SELECT id, title, column_id AS column FROM tasks ORDER BY created_at DESC'
+      'SELECT id, title, project, column_id AS column FROM tasks ORDER BY created_at DESC'
     );
     res.json(result.rows);
   } catch (error) {
@@ -182,7 +192,9 @@ app.get('/api/tasks', async (_req, res, next) => {
 
 app.post('/api/tasks', requireWriteAuth, writeRateLimit, async (req, res, next) => {
   const rawTitle = typeof req.body?.title === 'string' ? req.body.title : '';
+  const rawProject = typeof req.body?.project === 'string' ? req.body.project : '';
   const title = sanitizeTitle(rawTitle);
+  const project = sanitizeProject(rawProject || 'General');
 
   if (!title) {
     res.status(400).json({ error: 'Title is required.' });
@@ -192,14 +204,22 @@ app.post('/api/tasks', requireWriteAuth, writeRateLimit, async (req, res, next) 
     res.status(400).json({ error: 'Title must be 140 characters or fewer.' });
     return;
   }
+  if (!project) {
+    res.status(400).json({ error: 'Project is required.' });
+    return;
+  }
+  if (project.length > 64) {
+    res.status(400).json({ error: 'Project must be 64 characters or fewer.' });
+    return;
+  }
 
   try {
     const id = randomUUID();
     const result = await pool.query(
-      `INSERT INTO tasks (id, title, column_id)
-       VALUES ($1, $2, 'todo')
-       RETURNING id, title, column_id AS column`,
-      [id, title]
+      `INSERT INTO tasks (id, title, project, column_id)
+       VALUES ($1, $2, $3, 'todo')
+       RETURNING id, title, project, column_id AS column`,
+      [id, title, project]
     );
 
     res.status(201).json(result.rows[0]);
@@ -232,7 +252,7 @@ app.patch(
       `UPDATE tasks
        SET column_id = $2
        WHERE id = $1
-       RETURNING id, title, column_id AS column`,
+       RETURNING id, title, project, column_id AS column`,
       [id, column]
     );
 

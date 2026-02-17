@@ -33,10 +33,11 @@ This runs:
 - Task titles are sanitized and limited to 140 chars.
 
 In the UI, enter your password once to enable add/move actions, then a secure HttpOnly session cookie is used.
+The login prompt opens as a modal from the top-right Login button.
 
 ## Database
 
-On startup, server creates a `tasks` table automatically if it does not exist.
+On startup, server creates/migrates the `tasks` table automatically (`title`, `project`, `column_id`).
 
 ## Fly.io setup
 

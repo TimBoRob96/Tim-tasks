@@ -204,6 +204,29 @@ function App() {
     }
   };
 
+  const handleDeleteTask = async (taskId: string) => {
+    if (!canWrite) {
+      setError('Login required to delete tasks.');
+      return;
+    }
+
+    const previous = tasks;
+    setTasks((prev) => prev.filter((task) => task.id !== taskId));
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) {
+        throw new Error(await parseError(response, 'Failed to delete task.'));
+      }
+      setError(null);
+    } catch (err) {
+      setTasks(previous);
+      setError(err instanceof Error ? err.message : 'Failed to delete task.');
+    }
+  };
+
   const toggleProject = (project: string) => {
     setSelectedProjects((prev) => {
       if (prev.includes(project)) {
@@ -220,7 +243,7 @@ function App() {
     <div className="page">
       <header className="header">
         <div>
-          <h1>Kanban</h1>
+          <h1>Tim Tasks</h1>
           <p>Have a look at what I am working on!</p>
         </div>
         <div className="header-actions">
@@ -345,6 +368,16 @@ function App() {
                     draggable={canWrite}
                     onDragStart={(event) => event.dataTransfer.setData('taskId', task.id)}
                   >
+                    {canWrite ? (
+                      <button
+                        type="button"
+                        className="delete-btn"
+                        aria-label={`Delete ${task.title}`}
+                        onClick={() => void handleDeleteTask(task.id)}
+                      >
+                        ×
+                      </button>
+                    ) : null}
                     <div className="card-title">{task.title}</div>
                     <div className="card-project">{task.project}</div>
                   </div>

@@ -175,11 +175,25 @@ body {
 }
 
 .card {
+  position: relative;
   background: #f0f4f8;
   border-radius: 10px;
-  padding: 0.7rem;
+  padding: 0.85rem 0.7rem 0.7rem;
   border: 1px solid #d9e2ec;
   cursor: grab;
+}
+
+.delete-btn {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  border: 0;
+  background: transparent;
+  color: #9b1c1c;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.15rem 0.25rem;
 }
 
 .card-title {

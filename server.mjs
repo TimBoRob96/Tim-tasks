@@ -61,6 +61,12 @@ function sanitizeProject(value) {
   return withoutControls.replace(/\s+/g, ' ').trim();
 }
 
+function isUuidV4(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
+}
+
 function requireWriteAuth(req, res, next) {
   const token = getCookie(req, sessionCookieName);
   if (!token || !isValidSessionToken(token)) {
@@ -235,10 +241,8 @@ app.patch(
   async (req, res, next) => {
   const { id } = req.params;
   const column = typeof req.body?.column === 'string' ? req.body.column : '';
-  const uuidV4Pattern =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-  if (!uuidV4Pattern.test(id)) {
+  if (!isUuidV4(id)) {
     res.status(400).json({ error: 'Invalid task id.' });
     return;
   }
@@ -267,6 +271,25 @@ app.patch(
   }
   }
 );
+
+app.delete('/api/tasks/:id', requireWriteAuth, writeRateLimit, async (req, res, next) => {
+  const { id } = req.params;
+  if (!isUuidV4(id)) {
+    res.status(400).json({ error: 'Invalid task id.' });
+    return;
+  }
+
+  try {
+    const result = await pool.query('DELETE FROM tasks WHERE id = $1', [id]);
+    if (!result.rowCount) {
+      res.status(404).json({ error: 'Task not found.' });
+      return;
+    }
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Not found' });

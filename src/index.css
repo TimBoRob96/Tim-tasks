@@ -20,6 +20,16 @@ body {
   padding: 2rem 1rem 3rem;
 }
 
+.page.embedded {
+  max-width: 760px;
+  height: 100dvh;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  gap: 0.5rem;
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -139,12 +149,25 @@ body {
   gap: 1rem;
 }
 
+.board-embedded {
+  grid-template-columns: 1fr;
+  flex: 1;
+  min-height: 0;
+}
+
 .column {
   background: #fff;
   border-radius: 14px;
   padding: 0.75rem;
   box-shadow: 0 10px 30px rgba(16, 42, 67, 0.08);
   min-height: 360px;
+}
+
+.embedded .column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
 }
 
 .column-head {
@@ -172,6 +195,32 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+}
+
+.embedded .cards {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.column-tabs {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.column-tab {
+  border: 1px solid #bcccdc;
+  background: #f0f4f8;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-weight: 600;
+  color: #334e68;
+  cursor: pointer;
+}
+
+.column-tab.active {
+  background: #0b7285;
+  border-color: #0b7285;
+  color: #fff;
 }
 
 .card {

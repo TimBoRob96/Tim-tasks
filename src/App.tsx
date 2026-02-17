@@ -28,6 +28,19 @@ function App() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeColumn, setActiveColumn] = useState<ColumnId>('todo');
+
+  const isEmbedded = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('embed') === '1') return true;
+
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true;
+    }
+  }, []);
 
   const projects = useMemo(() => {
     const unique = [...new Set(tasks.map((task) => task.project))];
@@ -239,8 +252,12 @@ function App() {
   const selectAllProjects = () => setSelectedProjects(projects);
   const clearProjects = () => setSelectedProjects([]);
 
+  const displayedColumns = isEmbedded
+    ? columns.filter((column) => column.id === activeColumn)
+    : columns;
+
   return (
-    <div className="page">
+    <div className={`page ${isEmbedded ? 'embedded' : ''}`}>
       <header className="header">
         <div>
           <h1>Tim Tasks</h1>
@@ -345,8 +362,23 @@ function App() {
       {loading ? <p className="status">Loading tasks...</p> : null}
       {error ? <p className="status error">{error}</p> : null}
 
-      <section className="board">
-        {columns.map((column) => (
+      {isEmbedded ? (
+        <nav className="column-tabs" aria-label="Task bins">
+          {columns.map((column) => (
+            <button
+              key={column.id}
+              type="button"
+              className={`column-tab ${activeColumn === column.id ? 'active' : ''}`}
+              onClick={() => setActiveColumn(column.id)}
+            >
+              {column.title} ({counts[column.id]})
+            </button>
+          ))}
+        </nav>
+      ) : null}
+
+      <section className={`board ${isEmbedded ? 'board-embedded' : ''}`}>
+        {displayedColumns.map((column) => (
           <article
             key={column.id}
             className="column"

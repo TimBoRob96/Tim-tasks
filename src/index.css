@@ -35,6 +35,30 @@ body {
   margin: 1.5rem 0 0.75rem;
 }
 
+.write-key-row {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.65rem;
+}
+
+.write-key-row input {
+  flex: 1;
+  border: 1px solid #bcccdc;
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.95rem;
+}
+
+.write-key-row button {
+  border: 0;
+  border-radius: 10px;
+  background: #334e68;
+  color: #fff;
+  padding: 0.65rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .task-form input {
   flex: 1;
   border: 1px solid #bcccdc;
@@ -51,6 +75,11 @@ body {
   padding: 0.75rem 1rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+.task-form button:disabled {
+  background: #9fb3c8;
+  cursor: not-allowed;
 }
 
 .status {

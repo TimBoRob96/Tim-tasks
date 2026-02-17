@@ -17,16 +17,24 @@ const columns: { id: ColumnId; title: string }[] = [
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState('');
+  const [password, setPassword] = useState('');
+  const [canWrite, setCanWrite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchTasks = async () => {
+    const fetchInitialData = async () => {
       try {
-        const response = await fetch('/api/tasks');
-        if (!response.ok) throw new Error('Failed to load tasks.');
+        const [tasksResponse, authResponse] = await Promise.all([
+          fetch('/api/tasks'),
+          fetch('/api/auth-status')
+        ]);
+        if (!tasksResponse.ok) throw new Error('Failed to load tasks.');
+        if (!authResponse.ok) throw new Error('Failed to check auth status.');
 
-        const data: Task[] = await response.json();
+        const data: Task[] = await tasksResponse.json();
+        const auth: { canWrite: boolean } = await authResponse.json();
+        setCanWrite(auth.canWrite);
         setTasks(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load tasks.');
@@ -35,7 +43,7 @@ function App() {
       }
     };
 
-    fetchTasks();
+    fetchInitialData();
   }, []);
 
   const counts = useMemo(() => {
@@ -48,9 +56,61 @@ function App() {
     );
   }, [tasks]);
 
+  const parseError = async (response: Response, fallback: string) => {
+    try {
+      const payload: unknown = await response.json();
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'error' in payload &&
+        typeof payload.error === 'string'
+      ) {
+        return payload.error;
+      }
+    } catch {
+      // no-op, fallback below
+    }
+    return fallback;
+  };
+
+  const handleLogin = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!password) {
+      setError('Password required.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+
+      if (!response.ok) {
+        throw new Error(await parseError(response, 'Login failed.'));
+      }
+      setPassword('');
+      setCanWrite(true);
+      setError(null);
+    } catch (err) {
+      setCanWrite(false);
+      setError(err instanceof Error ? err.message : 'Login failed.');
+    }
+  };
+
+  const handleLogout = async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    setCanWrite(false);
+  };
+
   const handleAddTask = async (event: FormEvent) => {
     event.preventDefault();
     if (!newTask.trim()) return;
+    if (!canWrite) {
+      setError('Login required to add tasks.');
+      return;
+    }
 
     const pendingTitle = newTask.trim();
     setNewTask('');
@@ -62,7 +122,9 @@ function App() {
         body: JSON.stringify({ title: pendingTitle })
       });
 
-      if (!response.ok) throw new Error('Failed to create task.');
+      if (!response.ok) {
+        throw new Error(await parseError(response, 'Failed to create task.'));
+      }
       const created: Task = await response.json();
       setTasks((prev) => [created, ...prev]);
       setError(null);
@@ -77,6 +139,10 @@ function App() {
     targetColumn: ColumnId
   ) => {
     event.preventDefault();
+    if (!canWrite) {
+      setError('Login required to move tasks.');
+      return;
+    }
     const taskId = event.dataTransfer.getData('taskId');
     if (!taskId) return;
 
@@ -93,7 +159,9 @@ function App() {
         body: JSON.stringify({ column: targetColumn })
       });
 
-      if (!response.ok) throw new Error('Failed to move task.');
+      if (!response.ok) {
+        throw new Error(await parseError(response, 'Failed to move task.'));
+      }
       setError(null);
     } catch (err) {
       setTasks(previous);
@@ -108,6 +176,23 @@ function App() {
         <p>React + Vite + Fly.io + Neon Postgres</p>
       </header>
 
+      <form className="write-key-row" onSubmit={handleLogin}>
+        <input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          placeholder={canWrite ? 'Write access enabled' : 'Enter write password'}
+          aria-label="Write password"
+        />
+        {canWrite ? (
+          <button type="button" onClick={handleLogout}>
+            Logout
+          </button>
+        ) : (
+          <button type="submit">Login</button>
+        )}
+      </form>
+
       <form className="task-form" onSubmit={handleAddTask}>
         <input
           value={newTask}
@@ -115,7 +200,9 @@ function App() {
           placeholder="Add a task"
           aria-label="Task title"
         />
-        <button type="submit">Add</button>
+        <button type="submit" disabled={!canWrite}>
+          Add
+        </button>
       </form>
 
       {loading ? <p className="status">Loading tasks...</p> : null}
@@ -141,7 +228,7 @@ function App() {
                   <div
                     key={task.id}
                     className="card"
-                    draggable
+                    draggable={canWrite}
                     onDragStart={(event) => event.dataTransfer.setData('taskId', task.id)}
                   >
                     {task.title}
